@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os/user"
 
 	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/auth"
 	"github.com/google/uuid"
@@ -64,7 +63,18 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 		respondWithError(w, http.StatusUnauthorized, "You can't do that", err)
 		return
 	}
-	fmt.Print(content)
 
-	respondWithJSON(w, http.StatusOK, struct{}{})
+	videoThumbnails[video.ID] = thumbnail{
+		data:      content,
+		mediaType: mediaType,
+	}
+	thumbnailURL := fmt.Sprintf("http://localhost:%s/api/thumbnails/%s", cfg.port, videoID)
+	video.ThumbnailURL = &thumbnailURL
+
+	err = cfg.db.UpdateVideo(video)
+	if err != nil {
+		delete(videoThumbnails, videoID)
+		respondWithError(w, http.StatusInternalServerError, "Couldn't update video's thumbnail URL", err)
+	}
+	respondWithJSON(w, http.StatusOK, video)
 }
