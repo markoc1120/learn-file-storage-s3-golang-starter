@@ -3,12 +3,18 @@ package main
 import (
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
 	"os"
+	"slices"
 
 	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/auth"
 	"github.com/google/uuid"
 )
+
+func getSupportedMimeTypes() []string {
+	return []string{"image/jpeg", "image/png"}
+}
 
 func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Request) {
 	videoIDString := r.PathValue("videoID")
@@ -44,9 +50,15 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 		respondWithError(w, http.StatusBadRequest, "Unable to parse form file", err)
 		return
 	}
-	mediaType := header.Header.Get("Content-Type")
-	if mediaType == "" {
+	defer file.Close()
+
+	mediaType, _, err := mime.ParseMediaType(header.Header.Get("Content-Type"))
+	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "Bad Content-Type in the header", err)
+		return
+	}
+	if !slices.Contains(getSupportedMimeTypes(), mediaType) {
+		respondWithError(w, http.StatusBadRequest, "Not allowed media type", nil)
 		return
 	}
 
