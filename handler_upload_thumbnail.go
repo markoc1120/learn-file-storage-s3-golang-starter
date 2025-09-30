@@ -12,7 +12,7 @@ import (
 	"github.com/google/uuid"
 )
 
-func getSupportedMimeTypes() []string {
+func getSupportedMimeTypesForThumbnail() []string {
 	return []string{"image/jpeg", "image/png"}
 }
 
@@ -57,7 +57,7 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 		respondWithError(w, http.StatusBadRequest, "Bad Content-Type in the header", err)
 		return
 	}
-	if !slices.Contains(getSupportedMimeTypes(), mediaType) {
+	if !slices.Contains(getSupportedMimeTypesForThumbnail(), mediaType) {
 		respondWithError(w, http.StatusBadRequest, "Not allowed media type", nil)
 		return
 	}
