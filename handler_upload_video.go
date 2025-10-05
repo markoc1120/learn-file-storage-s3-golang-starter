@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"mime"
 	"net/http"
@@ -15,6 +16,17 @@ import (
 
 func getSupportedMimeTypesForVideo() []string {
 	return []string{"video/mp4"}
+}
+
+func getAspectRatioType(aspectRatio string) string {
+	switch aspectRatio {
+	case "16:9":
+		return "landscape"
+	case "9:16":
+		return "portrait"
+	default:
+		return "other"
+	}
 }
 
 func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request) {
@@ -84,14 +96,33 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 	}
 
 	tempFile.Seek(0, io.SeekStart)
+	processedFilePath, err := processVideoForFastStart(tempFile.Name())
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Couldn't process video with ffmpeg", err)
+		return
+	}
+	defer os.Remove(processedFilePath)
+
+	processedFile, err := os.Open(processedFilePath)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Couldn't open processed video", err)
+		return
+	}
+	defer processedFile.Close()
 
 	assetPath := getAssetPath(mediaType)
+	aspectRatio, err := getVideoAspectRatio(processedFilePath)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Couldn't get aspect ratio of the video", err)
+		return
+	}
+	assetPath = fmt.Sprintf("%s/%s", getAspectRatioType(aspectRatio), assetPath)
 	_, err = cfg.s3Client.PutObject(
 		context.TODO(),
 		&s3.PutObjectInput{
 			Bucket:      &cfg.s3Bucket,
 			Key:         &assetPath,
-			Body:        tempFile,
+			Body:        processedFile,
 			ContentType: &mediaType,
 		},
 	)
